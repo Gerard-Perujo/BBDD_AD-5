@@ -1,7 +1,7 @@
 create DATABASE IF NOT EXISTS tienda;
 use tienda;
 
--- desactivamos las llaves para poder introducir los datos a la base de datos --
+/* desactivamos las llaves para poder introducir los datos a la base de datos */
 set FOREIGN_KEY_CHECKS=0;
 
 CREATE TABLE `centros` (
@@ -32,14 +32,14 @@ CREATE TABLE `empleados` (
     `numde` int(3)
     );
     
--- una vez creadas las tablas insertamos los indices ---
+/* una vez creadas las tablas insertamos los indices */
 
--- tabla centros--
+/* tabla centros */
 
 ALTER TABLE `centros`
 	add primary key (`numce`);
 
--- tabla depàrtamentos--
+/* tabla depàrtamentos */
 
 ALTER TABLE `departamentos`
 	add primary key (`numde`),
@@ -47,14 +47,14 @@ ALTER TABLE `departamentos`
     add key `numce` (`numce`),
     add key `depde` (`depde`);
     
--- tabla empleados--
+/* tabla empleados */
 
 ALTER TABLE `empleados`
 	add primary key (`numem`),
     add key `numem` (`numem`),
     add key `numde` (`numde`);
     
--- ahora creamos los filtros para las diferentes tablas --
+/* ahora creamos los filtros para las diferentes tablas */
 
 ALTER TABLE `departamentos`
 	add constraint `departamentos_ibfk1` foreign key (`numce`) references `centros` (`numce`) on delete no action on update no action,
@@ -64,9 +64,9 @@ ALTER TABLE `empleados`
 	add constraint `empleados_ibfk1` foreign key (`numde`) references `departamentos` (`numde`) on delete no action on update no action;
 
 
--- ahora ya empezariamos a cargar los datos --
+/* ahora ya empezariamos a cargar los datos */
 
--- insertamos los campos de departamentos --
+/* insertamos los campos de departamentos */
 
 insert into departamentos (numde,numce,direc,tidir,presu,depde,nomde)
 values (100, 10, 260, 'P', 72, NULL, 'DIRECCIÓN_GENERAL');
@@ -92,7 +92,7 @@ values (122, 10, 350, 'P', 36, 120, 'PROCESO_DE_DATOS');
 insert into departamentos (numde,numce,direc,tidir,presu,depde,nomde)
 values (130, 10, 310, 'P', 12, 100, 'FINANZAS');
 
--- insertamos los campos de centros --
+/* insertamos los campos de centros */
 
 insert into centros (numce,nomce,dirce)
 values (10, 'cede central', 'C/ Atocha, 820, MADRID');
@@ -100,7 +100,7 @@ values (10, 'cede central', 'C/ Atocha, 820, MADRID');
 insert into centros (numce,nomce,dirce)
 values (20, 'relación con clientes', ' C/ Atocha, 405, MADRID');
 
--- insertamos los campos de empleados utilizando el bulk insert --
+/* insertamos los campos de empleados utilizando el bulk insert */
 
 insert into empleados (numem, extel, fecna, fecin, salar, comis, numhi, nomem, numde)
 values  (110, 350, '1970-11-10', '1985-02-15', 1800, NULL, 3, 'CESAR', 121),
@@ -139,9 +139,240 @@ values  (110, 350, '1970-11-10', '1985-02-15', 1800, NULL, 3, 'CESAR', 121),
         (550, 780, '1970-01-10', '1998-01-21', 600, 120, 0, 'SANCHO', 111);
         
         
-  -- Al finalizar la carga de todos los datos volvemos activar las llaves --     
+  /* Al finalizar la carga de todos los datos volvemos activar las llaves */     
  set FOREIGN_KEY_CHECKS=1;
  commit;
+
+
+
+/* Hacemos todas las Consultas que se nos piden en el ejercicio */
+
+
+/* 1. Para cada departamento con presupuesto inferior a 35.000 €, hallar le nombre del Centro donde está ubicado y 
+el máximo salario de sus empleados (si dicho máximo excede de 1.500 €). Clasificar alfabéticamente por nombre de departamento. */
+
+SELECT departamentos.nomde, departamentos.presu, centros.nomce, empleados.salar
+FROM departamentos, centros, empleados
+WHERE (departamentos.numce = centros.numce) AND (departamentos.numde = empleados.numde) AND (departamentos.presu < 35.0)
+HAVING empleados.salar >= 1500
+ORDER BY departamentos.nomde;
+
+/* 2. Hallar por orden alfabético los nombres de los departamentos que dependen de los que tienen un presupuesto inferior a 30.000 €. 
+También queremos conocer el nombre del departamento del que dependen y su presupuesto. */
+
+SELECT nomde AS nombre_departamento, presu AS preuspuesto
+FROM departamentos
+WHERE presu < 30.0
+ORDER BY nombre_departamento;
+
+/* 3. Obtener los nombres y los salarios medios de los departamentos cuyo salario medio supera al salario medio de la empresa. */
+
+SELECT departamentos.nomde, AVG(empleados.salar)
+FROM empleados
+LEFT JOIN departamentos ON empleados.numde = departamentos.numde 
+GROUP By departamentos.nomde
+HAVING AVG(empleados.salar) > (SELECT AVG(empleados.salar)
+				      FROM empleados);
+   
+/* 4. Para los departamentos cuyo director lo sea en funciones, hallar el número de empleados y la suma de sus salarios, comisiones y número de hijos. */
+                                      
+SELECT DISTINCT count(empleados.numem)AS cantidad_empleados, 
+count(empleados.numhi) AS Cantidad_hijos, SUM(empleados.salar)AS suma_salarios, SUM(empleados.comis)AS suma_comisiones, departamentos.nomde AS Nombre_departamento
+	FROM empleados
+	LEFT JOIN departamentos ON departamentos.numde = empleados.numde
+	WHERE departamentos.tidir = 'F'
+	GROUP BY departamentos.nomde;
+
+/* 5. Para los departamentos cuyo presupuesto anual supera los 35.000 €, hallar cuantos empleados hay por cada extensión telefónica. */
+                                        
+SELECT departamentos.nomde, count(empleados.numem) as numero_empleados, empleados.extel
+FROM departamentos, empleados
+WHERE departamentos.numde = empleados.numde AND departamentos.presu >= 35.0
+GROUP BY departamentos.nomde;
+
+
+
+/* 6. Hallar por orden alfabético los nombres de los empleados y su número de hijos para aquellos que son directores en funciones. */                                       
+
+SELECT nomem AS Nombre_empleado, numhi AS numero_hijos
+FROM empleados
+WHERE numde in (SELECT numde
+			    FROM departamentos
+				WHERE tidir ='F')
+GROUP BY nomem asc;
+
+
+/* 7. Hallar si hay algún departamento (suponemos que sería de reciente creación) que aún no tenga empleados asignados ni director en propiedad. */
+
+SELECT departamentos.nomde AS NOMBRE_DEPARTAMENTO, empleados.nomem AS NOMBRE_EMPL, departamentos.tidir AS TIPO_DIRECTOR
+FROM departamentos
+LEFT JOIN empleados ON departamentos.numde = empleados.numde
+WHERE empleados.numde IS NULL AND departamentos.tidir <> 'F';
+
+/* 8. Añadir un nuevo departamento de nombre NUEVO y con director en funciones. */
+
+-- antes de meter qualqueir dato desactivamos las llaves y ponemos un autocommit por si hay que restaurar los valores --
+SET FOREIGN_KEY_CHECKS = 0;
+SET AUTOCOMMIT = 0;
+INSERT INTO departamentos (numde, numce, direc, tidir, presu, depde, nomde)
+VALUES (140, 10, 160, 'F', 72, 100, 'NUEVO');
+SET FOREIGN_KEY_CHECKS = 1;
+ROLLBACK;
+
+-- al finalizar volver activar las llaves --
+
+-- volvemos a comprobar si el nuevo departamento a sido introducido en la tabla departamentos --
+SELECT *
+FROM departamentos;
+
+/* 9. Añadir un nuevo empleado de nombre NORBERTO y sin departamento asignado. Inventar el resto de datos. */
+
+-- antes de meter qualqueir dato desactivamos las llaves y ponemos un autocommit por si hay que restaurar los valores --
+SET FOREIGN_KEY_CHECKS = 0;
+SET AUTOCOMMIT = 0;
+INSERT INTO empleados (numem, extel, fecna, fecin, salar, comis, numhi, nomem, numde)
+VALUES (570, 926, '1998-02-15', '2019-02-15', 1900, NULL, 4, 'NORBERTO', NULL); 
+SET FOREIGN_KEY_CHECKS = 1;
+rollback;
+
+-- al finalizar volver activar las llaves --
+
+-- comprovamos si el nuevo empleado ha sido introducido en la tabla empleados --
+SELECT *
+FROM empleados; 
+
+/* 10. Muestra los departamentos que no tienen empleados. */
+
+
+SELECT departamentos.numde AS DEPARTAMENTO, empleados.numde AS EMPLEADOS
+FROM departamentos
+LEFT JOIN empleados ON departamentos.numde = empleados.numde
+WHERE empleados.numde IS NULL; 
+
+/* 11. Muestra los nombres de departamentos que no tienen empleados haciendo uso la combinación externa LEFT JOIN. 
+Muestra una segunda columna con los nombres de empleados para asegurarnos que realmente está a NULL. */
+
+SELECT departamentos.numde AS DEPARTAMENTO, departamentos.nomde AS NOMBRE_DEPARTAMENTO, empleados.numde AS ID_EMPLEADO, empleados.nomem AS NOMBRE_EMPLEADO
+FROM departamentos 
+LEFT JOIN empleados ON departamentos.numde = empleados.numde 
+WHERE empleados.numde IS NULL; 
+
+/* 12. Muestra los nombres de departamentos que no tienen empleados haciendo uso la combinación externa RIGH JOIN. 
+Muestra una segunda columna con los nombres de empleados para asegurarnos que realmente está a NULL.*/
+
+SELECT departamentos.numde AS NUM_DEPARTAMENTO, departamentos.nomde AS NOMBRE_DEPARTAMENTO, empleados.numde AS NUM_EMPLEADO, empleados.nomem AS NOMBRE_EMPLEADO
+FROM empleados 
+RIGHT JOIN departamentos ON departamentos.numde = empleados.numde 
+WHERE empleados.numde IS NULL; 
+
+/* 13. Muestra los nombres de empleados que no tienen departamento haciendo uso la combinación externa LEFT JOIN. 
+Muestra una segunda columna con los nombres de departamentos para asegurarnos que realmente esta a NULL. */
+
+SELECT departamentos.numde AS NUM_DEPARTAMENTO, departamentos.nomde AS NOMBRE_DEPARTAMENTO, empleados.nomem AS NOMBRE_EMPLEADO
+FROM empleados 
+LEFT JOIN departamentos ON empleados.numde = departamentos.numde 
+WHERE departamentos.numde IS NULL;
+
+/* 14. Muestra los nombres de empleados que no tienen departamento haciendo uso la combinación externa RIGHT JOIN. 
+Muestra una segunda columna con los nombres de empleados para asegurarnos que realmente esta a NULL. */
+
+SELECT empleados.nomem AS NOMBRE_EMPLEADOS, departamentos.numde AS NUM_DEPARTAMENTO, departamentos.nomde AS NOMBRE_DEPARTAMENTO
+FROM departamentos
+RIGHT JOIN empleados ON departamentos.numde = empleados.numde
+WHERE empleados.numde IS NULL; 
+
+/* 15. Muestra los departamentos que no tienen empleados y los empleados que no tiene departamento haciendo uso la combinación externa FULL JOIN. */
+
+/*
+Por problemas de compatibilidad, en muchos casos MySQL no acepta el full join, cuyo esquema es el siguiente:
+SELECT columns
+FROM table1
+FULL [OUTER] JOIN table2
+ON table1.column = table2.column;
+Para solucionarlo, interesa aplicar la union de un left join con un right join, como se va a desarrollar a continuacion:
+*/
+
+SELECT * 
+FROM departamentos LEFT JOIN empleados 
+ON departamentos.numde = empleados.numde
+UNION
+SELECT * 
+FROM departamentos  RIGHT JOIN empleados
+ON departamentos.numde = empleados.numde;
+
+/* 16. Muestra los empleados y sus respectivos departamentos haciendo uso de la combinación interna INNER JOIN. 
+¿Aparecen el departamento NUEVO y el empleado NORBERTO?¿Por qué? */
+
+select departamentos.nomde as nombre_departamento, empleados.nomem as nombre_empleado
+from empleados
+inner join departamentos
+on departamentos.numde = empleados.numde;
+
+/*
+No aparecen ni el departamento NUEVO ni NORBERTO ya que INNER JOIN a la hora de mostrar por pantalla el resultado de la ejecucion suele excluir filas en las que hay datos nulos en alguna columna correspondiente. 
+Los valores nulos no contarían con el mismo tratamiento de igualdad que el resto de datos.
+*/
+
+/*  17. Realiza la misma consulta anterior donde se cumpla la condición que NUMDE está a NULL. ¿Aparece algún resultado?¿Por qué? */
+
+select departamentos.nomde as nombre_departamento, empleados.nomem as nombre_empleado
+from empleados
+inner join departamentos
+on departamentos.numde = empleados.numde
+where departamentos.numde is null;
+
+/*
+No aparece ningun resultado ya que cuando se utiliza un inner join con la clausula 'where' y la condicion 'is null' solo muestra aquellas filas cuyo valor sea null. Para este caso, no encuentra ningun valor que mostrar por pantalla.
+*/
+
+/* 18. Muestra los empleados y sus respectivos departamentos haciendo uso de la combinación interna NATURAL JOIN. */
+
+select *
+from empleados
+natural join departamentos;
+
+/* 19. Muestra la combinación de las 3 tablas CENTROS, DEPARTAMENTOS y EMPLEADOS haciendo uso de NATURAL JOIN. */
+
+select *
+from empleados
+natural join departamentos
+natural join centros;
+
+/* 20. Borra los registros dados de alta para el departamento NUEVO y el empleado introducido en el apartado anterior. */
+
+-- desactivamos las llaves antes de hacer un delete y ponemos un autocommit por si hay que restaurar los valores --
+SET FOREIGN_KEY_CHECKS = 0;
+delete 
+from departamentos
+WHERE nomde = 'NUEVO';
+SET FOREIGN_KEY_CHECKS = 1;
+
+
+-- desactivamos las llaves antes de hacer un delete y ponemos un autocommit por si hay que restaurar los valores --
+SET FOREIGN_KEY_CHECKS = 0;
+delete 
+from empleados
+WHERE nomde = 'NORBERTO';
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- comprobamos que tanto el nombre del empleado NORBERTO como el departamento NUEVO han sido borrados --
+SELECT *
+FROM empleados, departamentos
+WHERE empleados.numde = departamentos.numde 
+GROUP BY departamentos.nomde;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     
